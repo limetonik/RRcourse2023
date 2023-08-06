@@ -1,0 +1,109 @@
+---
+title: "Metaanalysis"
+author: "Yelyzaveta Nemchynova"
+date: "`r Sys.Date()`"
+format:  
+  html:
+    theme: dark
+    toc: true
+    toc_float: true
+title-block-banner: true
+execute:
+  echo: fenced
+---
+
+```{r}
+library(readxl)
+library(meta)
+library(metafor)
+library(dplyr)
+
+# Import the dataset
+setwd("C:/Users/lizan/OneDrive/Documents/GitHub/RRcourse2023/13. Metaanalysis")
+data <- read_excel("metaanalysis_data.xlsx")
+
+# Using metagen() function for meta-analysis using fixed effect model
+fixed_model <- meta::metagen(
+  TE = data$Mean_boys_play_male,
+  seTE = data$SD_boys_play_male,
+  studlab = data$Study,
+  comb.fixed = TRUE,
+  comb.random = FALSE
+)
+
+# Display the results of fixed effect model
+fixed_model
+
+```
+The z-value is 7.81 and the associated p-value is less than 0.0001, indicating this result is statistically significant. This model assumes that all studies share a common effect size.
+
+The measure I^2 is 48.7%, indicating that about 49% of the total variation across studies is due to heterogeneity rather than chance. H is 1.40, suggesting a moderate level of heterogeneity. The test of heterogeneity (Q test) has a p-value of 0.0026, indicating the presence of significant heterogeneity among the studies.
+
+```{r}
+# Using metacont() function to combine fixed and random effects
+combined_model <- meta::metacont(
+  n.e = data$N_boys,
+  mean.e = data$Mean_boys_play_male,
+  sd.e = data$SD_boys_play_male,
+  n.c = data$N_girls,
+  mean.c = data$Mean_girls_play_male,
+  sd.c = data$SD_girls_play_male,
+  studlab = data$Study,
+  comb.fixed = TRUE,
+  comb.random = TRUE
+)
+
+# Display the results of the combined model
+combined_model
+```
+
+The heterogeneity in this model is high with I^2 at 88.0%.
+**Given this result, there seems to be a significant effect of methods or quality on the results across studies.**
+
+```{r}
+# Perform random effects meta-analysis
+random_model <- meta::metagen(
+  TE = data$Mean_boys_play_male,
+  seTE = data$SD_boys_play_male,
+  studlab = data$Study,
+  comb.fixed = FALSE,
+  comb.random = TRUE
+)
+
+# Display the results of random effect model
+random_model
+```
+
+The z-value is 6.40, and the associated p-value is less than 0.0001, indicating this result is statistically significant. This model allows for the possibility that the true effect could vary from study to study.
+
+```{r}
+# Plotting forest plot for fixed effect model, sorted by Mean_boys_play_male
+forest(fixed_model, sortvar = data$Mean_boys_play_male)
+
+# Perform meta-regression with author gender and neutral toys present as predictors
+metareg_model <- metareg(random_model, ~ data$`Female authors` + data$`Neutral toys`)
+
+# Display the results of meta-regression
+metareg_model
+```
+
+The Test for Residual Heterogeneity returns a p-value of 0.5090, indicating that there is no significant residual heterogeneity. The Test of Moderators returns a p-value of < 0.0001, indicating that the moderators ("Female authors" and "Neutral toys") are significant.
+
+This table gives the estimates of the coefficients in the model. For instance, the coefficient for "Female authors" is -76.2058 with a p-value of < 0.0001, indicating that the number of female authors is significantly associated with the effect size in the expected direction. 
+**The gender of the author does have a significant effect on the results. Studies authored by females tend to show a different effect size than those authored by other gender groups.**
+
+Similarly, the variable "Neutral toys" has a significant positive effect on the effect size.
+
+```{r}
+# Plotting funnel plot for random effect model
+funnel(random_model)
+
+# Adding contours to the funnel plot
+contour_levels <- c(0.70, 0.75, 0.75)
+contour_colors <- c("darkblue", "blue", "lightblue")
+funnel(random_model, contour = contour_levels, col.contour = contour_colors)
+legend("topright", c("p < 0.10", "p < 0.05", "p < 0.01"), bty = "n", fill = contour_colors)
+
+```
+
+The displayed plot reveals an asymmetrical distribution, suggesting potential publication bias or variability among the studies (heterogeneity).
